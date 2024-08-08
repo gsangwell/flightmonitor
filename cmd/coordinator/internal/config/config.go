@@ -2,8 +2,12 @@ package config
 
 import (
 	"os"
-	"log/slog"
+	"fmt"
+	"strings"
+	"bufio"
+        "regexp"
 	"gopkg.in/yaml.v2"
+	"github.com/spf13/cobra"
 )
 
 type Config struct {
@@ -23,10 +27,9 @@ type Config struct {
 }
 
 func LoadConfig() error {
-	f, err := os.Open("coordinator.yaml")
+	f, err := os.Open(File)
 
 	if err != nil {
-		slog.Error("loadConfig", "err", err)
 		return err
 	}
 
@@ -39,11 +42,119 @@ func LoadConfig() error {
 	err = decoder.Decode(&AppConfig)
 
 	if err != nil {
-		slog.Error("loadConfig", "f", f, "err", err)
 		return err
 	}
 
 	return nil
 }
 
+func Configure(cmd *cobra.Command, args []string) {
+	// coordinator:
+	//  listen: 0.0.0.0
+	//  port: 9001
+	//server:
+	//  protocol: http
+	//  host: <roster-server>
+	//  port: 8080
+	//cluster:
+	//  site: site
+	//  name: cluster
+
+	roster := readInputStrictMatches("Roster Server", `(?P<protocol>http|https)://(?P<host>.*):(?P<port>[0-9]*)`, 3)
+	site := readInputStrict("Site Name", `(^[a-zA-Z0-9]*$)`)
+	cluster := readInputStrict("Cluster Name", `(^[a-zA-Z0-9]*$)`)
+
+	var new_config Config
+
+	new_config.Coordinator.Listen = "0.0.0.0"
+	new_config.Coordinator.Port = "9001"
+
+        new_config.Server.Protocol = roster[1]
+        new_config.Server.Host = roster[2]
+        new_config.Server.Port = roster[3]
+
+	new_config.Cluster.Site = site
+	new_config.Cluster.Name = cluster
+
+        f, err := os.OpenFile(File, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+
+        if err != nil {
+                fmt.Println("Error saving configuration.")
+                return
+        }
+
+        if f != nil {
+                defer f.Close()
+        }
+
+        enc := yaml.NewEncoder(f)
+
+        err = enc.Encode(new_config)
+
+        if err != nil {
+                fmt.Println("Error saving configuration.")
+                return
+        }
+
+        fmt.Println("Configuration saved!")
+}
+
+func readInputStrictMatches(prompt string, pattern string, expected int) []string {
+        reader := bufio.NewReader(os.Stdin)
+
+        var matches []string
+        valid := false
+
+        for !valid {
+		fmt.Print(prompt + ": ")
+		line, _ := reader.ReadString('\n')
+		line, _ = strings.CutSuffix(line, "\n")
+		line, _ = strings.CutSuffix(line, "\r")
+
+                r := regexp.MustCompile(pattern)
+                matches = r.FindStringSubmatch(line)
+
+                if len(matches) == (expected  + 1){
+                        valid = true
+                }
+        }
+
+        return matches
+}
+
+func readInputStrict(prompt string, pattern string) string {
+        reader := bufio.NewReader(os.Stdin)
+
+        var matches []string
+        valid := false
+
+        for !valid {
+                fmt.Print(prompt + ": ")
+                line, _ := reader.ReadString('\n')
+                line, _ = strings.CutSuffix(line, "\n")
+                line, _ = strings.CutSuffix(line, "\r")
+
+                r := regexp.MustCompile(pattern)
+                matches = r.FindStringSubmatch(line)
+
+                if len(matches) == 2 {
+                        valid = true
+                }
+        }
+
+        return matches[1]
+}
+
+func readInput(prompt string) string {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print(prompt + ": ")
+	line, _ := reader.ReadString('\n')
+        line, _ = strings.CutSuffix(line, "\n")
+        line, _ = strings.CutSuffix(line, "\r")
+
+	return line
+}
+
 var AppConfig Config
+var File string
