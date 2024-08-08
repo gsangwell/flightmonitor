@@ -1,0 +1,16 @@
+roster:
+  listen: 0.0.0.0
+  port: 8080
+database:
+  host: <mariadb-host>
+  port: <mariadb-port>
+  username: <mariadb-user>
+  password: <mariadb-password>
+  database: <mariadb-database>
+slack:
+  token: <slack-token>
+  channel: <slack-channel>
+zabbix:
+  api: <zabbix-api-url>
+  username: <zabbix-username>
+  password: <zabbix-password>

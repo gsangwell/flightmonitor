@@ -1,0 +1,4 @@
+server:
+  protocol: http
+  host: <coordinator-server>
+  port: 9001
